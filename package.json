@@ -1,0 +1,19 @@
+{
+  "name": "pg-type-generator",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "bin": {
+    "pg-gen-types": "gen.mjs"
+  },
+  "author": "De Voorhoede",
+  "license": "ISC",
+  "dependencies": {
+    "@types/yargs": "^17.0.9",
+    "pg": "^8.7.3",
+    "yargs": "^17.3.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.6.5"
+  }
+}
