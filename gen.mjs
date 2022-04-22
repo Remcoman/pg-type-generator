@@ -23,13 +23,13 @@ const args = yargs(hideBin(process.argv))
     })
     .option('one2many-relations', {
         type: 'string',
-        choices: ['none', 'simple'],
+        choices: ['none', 'simple', 'links'],
         default: 'none',
         alias: 'oneToManyRelations'
     })
     .option('one2one-relations', {
         type: 'string',
-        choices: ['none', 'simple'],
+        choices: ['none', 'simple', 'links'],
         default: 'none',
         alias: 'oneToOneRelations'
     })
@@ -66,26 +66,42 @@ for(let [name, values] of Object.entries(enums)) {
     formatter.writeLine('')
 }
 
-for(let { table_name, columns } of tables) {
-    if(args.excludeTable.some(regex => regex.test(table_name))) {
-        continue
-    }
-    
+const tables_filtered = tables.filter(({ table_name }) => !args.excludeTable.some(regex => regex.test(table_name)))
+
+for(let { table_name, columns } of tables_filtered) {
     const name = pascalCase(table_name);
 
     formatter.writeLine(`export type ${name} = {`)
     formatter.startIndent()
+
+    formatter.writeLine(`__tableName: '${table_name}',`)
+
     for(let col of columns) {
         const colName = transform(args.columnTransform, col.name);
         formatter.writeLine(`${colName}${col.nullable ? '?' : ''}: ${col.type},`)
     }
+
+    let links = [];
     
     if(args.oneToOneRelations !== 'none') {
         const oneToOneReferences = foreign_keys.filter(key => key.from_table === table_name & key.from_column.length === 1)
+
         if(oneToOneReferences.length) {
-            formatter.writeLine('')
-            for(let foreignKey of oneToOneReferences) {
-                formatter.writeLine(`${transform(args.columnTransform, removeId(foreignKey.from_column[0]))}?: ${foreignKey.to_table},`)
+            if(args.oneToOneRelations === 'simple') {
+                formatter.writeLine('')
+                for(let foreignKey of oneToOneReferences) {
+                    formatter.writeLine(`${transform(args.columnTransform, removeId(foreignKey.from_column[0]))}?: ${foreignKey.to_table},`)
+                }
+            } else if(args.oneToOneRelations === 'links') {
+                links = [
+                    ...links,
+                    ...oneToOneReferences.map(foreignKey => ({
+                        type: 'one',
+                        destTable: foreignKey.to_table,
+                        destColumn: foreignKey.to_column,
+                        srcColumn: foreignKey.from_column
+                    }))
+                ]
             }
         }
     }
@@ -93,17 +109,46 @@ for(let { table_name, columns } of tables) {
     if(args.oneToManyRelations !== 'none') {
         const oneToManyReferences = foreign_keys.filter(key => key.to_table === table_name)
         if(oneToManyReferences.length) {
-            formatter.writeLine('')
-            for(let foreignKey of oneToManyReferences) {
-                formatter.writeLine(`${pluralize(transform(args.columnTransform, foreignKey.from_table))}?: ${foreignKey.from_table}[],`)
+            if(args.oneToManyRelations === 'simple') {
+                formatter.writeLine('')
+                for(let foreignKey of oneToManyReferences) {
+                    formatter.writeLine(`${pluralize(transform(args.columnTransform, foreignKey.from_table))}?: ${foreignKey.from_table}[],`)
+                }
+            } else if(args.oneToManyRelations === 'links') {
+                links = [
+                    ...links, 
+                    ...oneToManyReferences.map(foreignKey => ({
+                        type: 'many',
+                        destTable: foreignKey.from_table,
+                        destColumn: foreignKey.from_column,
+                        srcColumn: foreignKey.to_column 
+                    }))
+                ]
             }
         }
+    }
+
+    if(links.length) {
+        formatter.writeLine('__links: ')
+        formatter.startIndent()
+        formatter.join(links, ({ type, destTable, destColumn, srcColumn }) => {
+            formatter.writeLine(`{ type: '${type}', destTable: '${destTable}', destColumn: '${destColumn}', srcColumn: '${srcColumn}' }`)
+        }, ' |')
+        formatter.endIndent()
+        formatter.write(',')
     }
     
     formatter.endIndent()
     formatter.writeLine('};')
     formatter.writeLine('')
 }
+
+formatter.writeLine('export type Tables = ')
+formatter.startIndent()
+for(let [index, { table_name }] of tables_filtered.entries()) {
+    formatter.writeLine(`${pascalCase(table_name)}${index < tables_filtered.length - 1 ? ' |' : ''}`)
+}
+formatter.endIndent()
 
 function transform(type, value) {
     switch(type) {
