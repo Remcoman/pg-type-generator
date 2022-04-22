@@ -6,7 +6,7 @@
   "bin": {
     "pg-gen-types": "gen.mjs"
   },
-  "author": "De Voorhoede",
+  "author": "Remco Krams",
   "license": "ISC",
   "dependencies": {
     "@types/yargs": "^17.0.9",
