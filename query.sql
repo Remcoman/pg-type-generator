@@ -23,10 +23,16 @@ tables AS (
                         WHEN 'D' THEN 'Date'
                         WHEN 'B' THEN 'boolean'
                         WHEN 'A' THEN 'Array'
+                        WHEN 'E' THEN 'Enum'
                         ELSE 'unknown'
                     END),
                     'nullable', pg_attribute.attnotnull <> TRUE
-                )
+                ) || (
+					CASE pg_type.typcategory 
+						WHEN 'E' THEN jsonb_build_object('subtype', pg_type.typname)
+						ELSE '{}'::jsonb
+					END
+				)
                 ORDER BY 
                     (CASE
                         WHEN pg_attribute.attname = 'id' THEN -1

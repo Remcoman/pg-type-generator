@@ -78,7 +78,11 @@ for(let { table_name, columns } of tables_filtered) {
 
     for(let col of columns) {
         const colName = transform(args.columnTransform, col.name);
-        formatter.writeLine(`${colName}${col.nullable ? '?' : ''}: ${col.type},`)
+        let type = col.type
+        if(col.type === 'Enum') {
+            type = col.subtype
+        }
+        formatter.writeLine(`${colName}${col.nullable ? '?' : ''}: ${type},`)
     }
 
     let links = [];
